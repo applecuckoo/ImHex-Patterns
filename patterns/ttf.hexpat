@@ -960,12 +960,30 @@ bitfield Style {
     padding : 6;
 };
 
+enum TypeVendor : u8 {
+    Reserved,
+    Agfa,
+    Bitstream,
+    Linotype,
+    Monotype,
+    Adobe,
+    FontRepackager,
+    UniqueVendor,
+    Reserved = 8 ... 15
+};
+
+bitfield TypeFamily {
+    TypeVendor vendor : 4;
+    familyNumber : 12;
+};
+
 struct PCLTTable {
     u16 majorVersion, minorVersion;
     FontNumber fontNumber;
     u16 pitch, xHeight;//, style, typeFamily, capHeight, symbolSet;
     Style style;
-    u16 typeFamily, capHeight, symbolSet;
+    TypeFamily typeFamily;//, capHeight, symbolSet;
+    u16 capHeight, symbolSet;
     char typeface[16];
     s8 characterComplement[8];
     s8 fileName[6];
