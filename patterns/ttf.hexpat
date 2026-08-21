@@ -918,10 +918,54 @@ struct FontNumber {
     u24 fontNumber;
 };
 
+enum Posture : u8 {
+    Upright,
+    Italic,
+    AltItalic,
+    Reserved
+};
+
+enum AppearanceWidth : u8 {
+    Normal,
+    Condensed,
+    CompressedExtraCondensed,
+    ExtraCompressed,
+    UltraCompressed,
+    Reserved,
+    ExtendedExpanded,
+    ExtraExtendedExpanded
+};
+
+enum Structure : u8 {
+    Solid,
+    Outline,
+    Inline,
+    ContourDistressed,
+    SolidShadow,
+    OutlineShadow,
+    InlineShadow,
+    ContourShadow,
+    Patterned = 8 ... 11,
+    PatternedShadow = 12 ... 15,
+    Inverse,
+    InverseOpenBorder,
+    Reserved = 18 ... 30,
+    Unknown
+};
+
+bitfield Style {
+    Posture posture : 2;
+    AppearanceWidth appearanceWidth : 3;
+    Structure structure : 5;
+    padding : 6;
+};
+
 struct PCLTTable {
     u16 majorVersion, minorVersion;
     FontNumber fontNumber;
-    u16 pitch, xHeight, style, typeFamily, capHeight, symbolSet;
+    u16 pitch, xHeight;//, style, typeFamily, capHeight, symbolSet;
+    Style style;
+    u16 typeFamily, capHeight, symbolSet;
     char typeface[16];
     s8 characterComplement[8];
     s8 fileName[6];
@@ -1005,8 +1049,6 @@ struct SVGTable {
 // end SVG
 
 // start VDMX
-
-
 
 struct RatioRange {
     u8 bCharSet, xRatio, yStartRatio, yEndRatio;
