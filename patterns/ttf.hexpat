@@ -47,11 +47,7 @@ fn format_longdatetime(auto t) {
 
 struct LongDatetime {
     s64 time;
-    // dt parsing appears to be bad
-    //std::print("calculated ldt: {}", std::time::to_utc(u32(time - 2082844800)));
-    //std::print("calculated ldt: {}", u32(time - 2082844800));
 } [[format("format_longdatetime")]];
-//std::print("test: {}", std::time::to_local(std::time::epoch()));
 
 u64 currentOffset;
 u64 currentLength;
@@ -62,6 +58,30 @@ u16 gNumGlyphs;
 u16 numOfLongVerMetrics;
 s16 indexToLocFormat;
 
+// begin layout common table formats
+
+using GDEFGlyphClasses;
+
+struct ClassRange<auto tableString> {
+    u16 startGlyphID, endGlyphID;
+    if (tableString == "GDEF")
+        GDEFGlyphClasses class;
+    else
+        u16 class;
+};
+
+struct ClassDefFormat<auto tableString> {
+    u16 format;
+    if (format == 1) {
+        u16 startGlyphID, glyphCount;
+        u16 classValues[glyphCount];
+    } if (format == 2) {
+        u16 classRangeCount;
+        ClassRange<tableString> classRangeRecords[classRangeCount];
+    }
+};
+
+// end layout common table formats
 
 // begin avar
 
@@ -455,25 +475,6 @@ enum GDEFGlyphClasses : u16 {
     COMPONENT_GLYPH
 };
 
-struct ClassRange<auto tableString> {
-    u16 startGlyphID, endGlyphID;
-    if (tableString == "GDEF")
-        GDEFGlyphClasses class;
-    else
-        u16 class;
-};
-
-struct ClassDefFormat<auto tableString> {
-    u16 format;
-    if (format == 1) {
-        u16 startGlyphID, glyphCount;
-        u16 classValues[glyphCount];
-    } if (format == 2) {
-        u16 classRangeCount;
-        ClassRange<tableString> classRangeRecords[classRangeCount];
-    }
-};
-
 struct AttachPoint {
     u16 pointCount;
     u16 pointIndices[pointCount];
@@ -490,10 +491,9 @@ struct AttachList {
 struct GDEFTable {
     u32 beginningOfGDEFTable = $;
     u16 majorVersion, minorVersion, glyphClassDefOffset, attachListOffset, ligCaretListOffset, markAttachClassDefOffset;
-    //u16 glyphClassDefOffset;
     
-    //if (glyphClassDefOffset != 0)
-    ClassDefFormat<"GDEF"> glyphClassDef @ beginningOfGDEFTable + glyphClassDefOffset;
+    if (glyphClassDefOffset != 0)
+        ClassDefFormat<"GDEF"> glyphClassDef @ beginningOfGDEFTable + glyphClassDefOffset;
     if (attachListOffset != 0)
         AttachList attachList @ beginningOfGDEFTable + attachListOffset;
     // this is a cheeky version check, it doesn't account for any major version increases
@@ -925,6 +925,20 @@ struct PostTable {
 
 // end post
 
+// start STAT
+
+
+
+struct STATTable {
+    u16 majorVersion, minorVersion, designAxisSize, designAxisCount;
+    u32 designAxesOffset;
+    u16 axisValueCount;
+    u32 offsetToAxisValueOffsets;
+    u16 elidedFallbackNameID;
+};
+
+// end STAT
+
 // start SVG
 
 struct SVGDocumentRecord {
@@ -1033,6 +1047,7 @@ struct Table {
         ("name"): NameTable table;
         ("OS/2"): OS2Table table;
         ("post"): PostTable table;
+        ("STAT"): STATTable table;
         ("SVG "): SVGTable table;
         ("vhea"): VheaTable table;
         ("vmtx"): VmtxTable table;
