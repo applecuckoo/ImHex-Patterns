@@ -1,4 +1,4 @@
-#pragma author Shimogawa (aka Rebuild)
+#pragma author Shimogawa (aka Rebuild), applecuckoo
 #pragma description TrueType/OpenType font
 #pragma endian big
 #pragma MIME font/ttf
@@ -10,7 +10,6 @@ import std.mem;
 import std.string;
 import std.time;
 import std.io;
-import std.ptr;
 import type.magic;
 
 struct TableDirectory {
@@ -755,6 +754,15 @@ struct LocaTable {
 
 // end loca
 
+// begin LTSH
+
+struct LTSHTable {
+    u16 version, numGlyphs;
+    u8 yPixels[numGlyphs];
+};
+
+// end LTSH
+
 // begin maxp
 
 bitfield Version16Dot16 {
@@ -892,6 +900,38 @@ struct OS2Table {
 
 // end OS/2
 
+// begin PCLT
+
+bitfield FontNumberFlag {
+    converted : 1;
+};
+
+// yes this is set up as a janky union
+// I can't think of any other way to read the flag *and* the vendor character
+union FlagVendor {
+    FontNumberFlag flag;
+    char vendor;
+};
+
+struct FontNumber {
+    FlagVendor flagVendor;
+    u24 fontNumber;
+};
+
+struct PCLTTable {
+    u16 majorVersion, minorVersion;
+    FontNumber fontNumber;
+    u16 pitch, xHeight, style, typeFamily, capHeight, symbolSet;
+    char typeface[16];
+    s8 characterComplement[8];
+    s8 fileName[6];
+    s8 strokeWeight, widthType;
+    u8 serifStyle;
+    padding[1];
+};
+
+// end PCLT
+
 // begin post
 
 struct PostTableV1 {
@@ -963,6 +1003,39 @@ struct SVGTable {
 };
 
 // end SVG
+
+// start VDMX
+
+
+
+struct RatioRange {
+    u8 bCharSet, xRatio, yStartRatio, yEndRatio;
+};
+
+struct vTable {
+    u16 yPelHeight;
+    s16 yMax, yMin;
+};
+
+struct VDMXGroup {
+    u16 recs;
+    u8 startsz, endsz;
+    vTable entry[recs];
+};
+
+struct VDMXGroupOffset {
+    u16 groupOffset;
+    VDMXGroup group @ parent.startOfVDMX + groupOffset;
+};
+
+struct VDMXTable {
+    u32 startOfVDMX = $;
+    u16 version, numRecs, numRatios;
+    RatioRange ratRange[numRatios];
+    VDMXGroupOffset vdmxGroupOffsets[numRatios];
+};
+
+// end VDMX
 
 // start vhea
 
@@ -1043,12 +1116,15 @@ struct Table {
         ("hhea"): HheaTable table;
         ("hmtx"): HmtxTable table;
         ("loca"): LocaTable table;
+        ("LTSH"): LTSHTable table;
         ("maxp"): MaxpTable table;
         ("name"): NameTable table;
         ("OS/2"): OS2Table table;
+        ("PCLT"): PCLTTable table;
         ("post"): PostTable table;
         ("STAT"): STATTable table;
         ("SVG "): SVGTable table;
+        ("VDMX"): VDMXTable table;
         ("vhea"): VheaTable table;
         ("vmtx"): VmtxTable table;
         (_): u8 data[td.length];
@@ -1070,4 +1146,3 @@ struct TTF {
 };
 
 TTF ttf @ 0x0;
-
