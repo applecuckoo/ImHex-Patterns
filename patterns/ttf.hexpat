@@ -10,6 +10,7 @@ import std.mem;
 import std.string;
 import std.time;
 import std.io;
+import std.ptr;
 import type.magic;
 
 struct TableDirectory {
@@ -46,8 +47,11 @@ fn format_longdatetime(auto t) {
 
 struct LongDatetime {
     s64 time;
+    // dt parsing appears to be bad
+    //std::print("calculated ldt: {}", std::time::to_utc(u32(time - 2082844800)));
+    //std::print("calculated ldt: {}", u32(time - 2082844800));
 } [[format("format_longdatetime")]];
-
+//std::print("test: {}", std::time::to_local(std::time::epoch()));
 
 u64 currentOffset;
 u64 currentLength;
@@ -55,7 +59,9 @@ u64 glyfStart;
 bool hasPostScriptOutlines = false;
 u16 numHMetrics;
 u16 gNumGlyphs;
+u16 numOfLongVerMetrics;
 s16 indexToLocFormat;
+
 
 // begin avar
 
@@ -197,6 +203,189 @@ struct CmapTable {
 
 // end cmap
 
+// begin colr
+
+enum PaintFormat : u8 {
+    PaintColrLayers = 1,
+    PaintSolid,
+    PaintVarSolid,
+    PaintLinearGradient,
+    PaintVarLinearGradient,
+    PaintRadialGradient,
+    PaintVarRadialGradient,
+    PaintSweepGradient,
+    PaintVarSweepGradient,
+    PaintGlyph,
+    PaintColrGlyph,
+    PaintTransform,
+    PaintVarTransform,
+    PaintTranslate,
+    PaintVarTranslate,
+    PaintScale,
+    PaintVarScale,
+    PaintScaleAroundCenter,
+    PaintVarScaleAroundCenter,
+    PaintScaleUniform,
+    PaintVarScaleUniform,
+    PaintScaleUniformAroundCenter,
+    PaintVarScaleUniformAroundCenter,
+    PaintRotate,
+    PaintVarRotate,
+    PaintRotateAroundCenter,
+    PaintVarRotateAroundCenter,
+    PaintSkew,
+    PaintVarSkew,
+    PaintSkewAroundCenter,
+    PaintVarSkewAroundCenter,
+    PaintComposite
+};
+
+struct PaintColrLayer {
+    u8 numLayers;
+    u32 firstLayerIndex;
+};
+
+struct PaintSolid {
+    u16 paletteIndex;
+    F2Dot14 alpha;
+};
+
+using Paint;
+
+struct PaintGlyph {
+    u24 paintOffset;
+    Paint paint @ parent.beginningOfPaint + paintOffset;
+    u16 glyphID;
+};
+
+struct ColorStop {
+    F2Dot14 stopOffset;
+    u16 paletteIndex;
+    F2Dot14 alpha;
+};
+
+enum Extend : u8 {
+    EXTEND_PAD,
+    EXTEND_REPEAT,
+    EXTEND_REFLECT
+};
+
+struct ColorLine {
+    Extend extend;
+    u16 numStops;
+    ColorStop colorStops[numStops];
+};
+
+struct PaintLinearGradient {
+    u24 colorLineOffset;
+    ColorLine colorLine @ parent.beginningOfPaint + colorLineOffset;
+    FWord x0, y0, x1, y1, x2, y2;
+};
+
+struct Paint {
+    u32 beginningOfPaint = $;
+    PaintFormat paintFormat;
+    match (paintFormat) {
+        (PaintFormat::PaintColrLayers): PaintColrLayer paintColrLayer;
+        (PaintFormat::PaintGlyph): PaintGlyph paintGlyph;
+        (PaintFormat::PaintSolid): PaintSolid paintSolid;
+        (PaintFormat::PaintLinearGradient): PaintLinearGradient paintLinearGradient;
+    }
+};
+
+struct BaseGlyph {
+    u16 glyphID, firstLayerIndex, numLayers;
+};
+
+struct LayerRecord {
+    u16 glyphID, paletteIndex;
+};
+
+struct BaseGlyphPaintRecord {
+    u16 glyphID;
+    u32 paintOffset;
+    // yes, this isn't the best way to read each paint table.
+    // in most cases a paint table will be used more than once,
+    // so the pattern will redundantly re-decode the paint table.
+    // feel free to contribute better solutions if you'd like!
+    Paint paintRecord @ parent.beginningOfBaseGlyphList + paintOffset;
+};
+
+struct BaseGlyphList {
+    u32 beginningOfBaseGlyphList = $;
+    u32 numBaseGlyphPaintRecords;
+    BaseGlyphPaintRecord baseGlyphPaintRecords[numBaseGlyphPaintRecords];
+};
+
+struct Layer {
+    u32 paintOffset;
+    // see above note regarding reading paint tables redundantly
+    Paint paint @ parent.beginningOfLayerList + paintOffset;
+};
+
+struct LayerList {
+    u32 beginningOfLayerList = $;
+    u32 numLayers;
+    Layer layers[numLayers];
+};
+
+struct Clip {
+    u16 startGlyphID, endGlyphID;
+    
+};
+
+struct ClipList {
+    u8 format;
+    u32 numClips;
+    Clip clips[numClips];
+};
+
+struct ColrTable {
+    u64 startOfColrTable = $;
+    u16 version, numBaseGlyphRecords;
+    u32 baseGlyphRecordsOffset, layerRecordsOffset;
+    u16 numLayerRecords;
+    if (baseGlyphRecordsOffset != 0)
+    BaseGlyph baseGlyphs[numBaseGlyphRecords];
+    if (layerRecordsOffset != 0)
+    LayerRecord layerRecords[numBaseGlyphRecords];
+    if (version == 1) {
+        u32 baseGlyphListOffset, layerListOffset, clipListOffset, varIndexMapOffset, itemVariationStoreOffset;
+        BaseGlyphList baseGlyphList @ startOfColrTable + baseGlyphListOffset;
+        if (layerListOffset != 0)
+        LayerList layerList @ startOfColrTable + layerListOffset;
+        if (clipListOffset != 0)
+        ClipList clipList @ startOfColrTable + clipListOffset;
+    }
+    
+};
+
+// end colr
+
+// begin cpal
+
+struct ColorRecord {
+    u8 blue, green, red, alpha;
+}[[hex::inline_visualize("color", red, green, blue, alpha)]];
+
+struct CpalTable {
+    u64 startOfCpalTable = $;
+    u16 version;
+    u16 numPaletteEntries;
+    u16 numPalettes;
+    u16 numColorRecords;
+    u32 colorRecordsArrayOffset;
+    u16 colorRecordIndices[numPalettes];
+    if (version == 1) {
+        u32 paletteTypesArrayOffset;
+        u32 paletteLabelsArrayOffset;
+        u32 paletteEntryLabelsArrayOffset;
+    }
+    ColorRecord colorRecords[numColorRecords] @ startOfCpalTable + colorRecordsArrayOffset;
+};
+
+// end cpal
+
 // begin cvt
 
 struct CvtTable {
@@ -205,6 +394,34 @@ struct CvtTable {
 };
 
 // end cvt
+
+// begin DSIG
+
+bitfield DSIGFlags {
+    padding: 15;
+    unresignable : 1;
+};
+
+struct SignatureBlock1 {
+    padding[4];
+    u32 signatureLength;
+    u8 signature[signatureLength];
+};
+
+struct SignatureRecord {
+    u32 format, length, signatureBlockOffset;
+    SignatureBlock1 signatureBlock @ parent.beginningOfDSIGTable + signatureBlockOffset;
+};
+
+struct DSIGTable {
+    u32 beginningOfDSIGTable  = $;
+    u32 version;
+    u16 numSignatures;
+    DSIGFlags flags;
+    SignatureRecord signatureRecords[numSignatures];
+};
+
+// end DSIG
 
 // begin gasp
 
@@ -228,6 +445,65 @@ struct GaspTable {
 };
 
 // end gasp
+
+// start gdef
+
+enum GDEFGlyphClasses : u16 {
+    BASE_GLYPH = 1,
+    LIGATURE_GLYPH,
+    MARK_GLYPH,
+    COMPONENT_GLYPH
+};
+
+struct ClassRange<auto tableString> {
+    u16 startGlyphID, endGlyphID;
+    if (tableString == "GDEF")
+        GDEFGlyphClasses class;
+    else
+        u16 class;
+};
+
+struct ClassDefFormat<auto tableString> {
+    u16 format;
+    if (format == 1) {
+        u16 startGlyphID, glyphCount;
+        u16 classValues[glyphCount];
+    } if (format == 2) {
+        u16 classRangeCount;
+        ClassRange<tableString> classRangeRecords[classRangeCount];
+    }
+};
+
+struct AttachPoint {
+    u16 pointCount;
+    u16 pointIndices[pointCount];
+};
+
+//struct AttachPoint
+
+struct AttachList {
+    u32 beginningOfAttachList = $;
+    u16 coverageOffset, glyphCount;
+    
+};
+
+struct GDEFTable {
+    u32 beginningOfGDEFTable = $;
+    u16 majorVersion, minorVersion, glyphClassDefOffset, attachListOffset, ligCaretListOffset, markAttachClassDefOffset;
+    //u16 glyphClassDefOffset;
+    
+    //if (glyphClassDefOffset != 0)
+    ClassDefFormat<"GDEF"> glyphClassDef @ beginningOfGDEFTable + glyphClassDefOffset;
+    if (attachListOffset != 0)
+        AttachList attachList @ beginningOfGDEFTable + attachListOffset;
+    // this is a cheeky version check, it doesn't account for any major version increases
+    if (minorVersion >= 2)
+        u16 markGlyphSetsDefOffset;
+    if (minorVersion >= 3)
+        u32 itemVarStoreOffset;
+};
+
+// end gdef
 
 // begin glyf
 
@@ -481,8 +757,14 @@ struct LocaTable {
 
 // begin maxp
 
+bitfield Version16Dot16 {
+    major : 16;
+    minor : 4;
+    padding : 12;
+};
+
 struct MaxpTable {
-    FixedPoint32 version;
+    Version16Dot16 version;
     u16 numGlyphs;
     gNumGlyphs = numGlyphs;
     if (!hasPostScriptOutlines) {
@@ -643,6 +925,60 @@ struct PostTable {
 
 // end post
 
+// start SVG
+
+struct SVGDocumentRecord {
+    u16 startGlyphID, endGlyphID;
+    u32 svgDocOffset, svgDocLength;
+    u8 svgDoc[svgDocLength] @ parent.startOfSVGDocumentList + svgDocOffset;
+};
+
+struct SVGDocumentList {
+    u64 startOfSVGDocumentList = $;
+    u16 numEntries;
+    SVGDocumentRecord documentRecords[numEntries];
+};
+
+struct SVGTable {
+    u64 startOfSVGTable = $;
+    u16 version;
+    u32 svgDocumentListOffset;
+    u32 reserved;
+    SVGDocumentList subtable @ startOfSVGTable + svgDocumentListOffset;
+    
+};
+
+// end SVG
+
+// start vhea
+
+struct VheaTable {
+    Version16Dot16 version;
+    FWord ascent, descent, lineGap;
+    UFWord advanceHeightMax;
+    FWord minTopSideBearing, minBottomSideBearing, yMaxExtent;
+    s16 caretSlopeRise, caretSlopeRun, caretOffset;
+    padding[8];
+    s16 metricDataFormat;
+    u16 numOfLongVerMetrics;
+};
+
+// end vhea
+
+// start vmtx
+
+struct VerticalMetrics {
+    UFWord advanceHeight;
+    FWord topSideBearing;
+};
+
+struct VmtxTable {
+    VerticalMetrics verticalMetrics[numOfLongVerMetrics];
+    FWord monospaceTopSideBearing[gNumGlyphs - numOfLongVerMetrics];
+};
+
+// end vmtx
+
 struct HiddenForPreprocessing {
     u64 defStart = $;
     TableDirectory td;
@@ -657,6 +993,10 @@ struct HiddenForPreprocessing {
         ("head"): {
             HeadTable table;
             indexToLocFormat = table.indexToLocFormat;
+        }
+        ("vhea"): {
+            VheaTable table;
+            numOfLongVerMetrics = table.numOfLongVerMetrics;
         }
         ("glyf"): {
             glyfStart = $;
@@ -675,8 +1015,12 @@ struct Table {
         ("avar"): AvarTable table;
         ("bhed"): HeadTable table;
         ("cmap"): CmapTable table;
+        ("COLR"): ColrTable table;
+        ("CPAL"): CpalTable table;
         ("cvt "): CvtTable table;
+        ("DSIG"): DSIGTable table;
         ("gasp"): GaspTable table;
+        ("GDEF"): GDEFTable table;
         // ("glyf"): GlyfTable table;
         // glyf will be contained in loca.
         ("glyf"): {}
@@ -689,6 +1033,9 @@ struct Table {
         ("name"): NameTable table;
         ("OS/2"): OS2Table table;
         ("post"): PostTable table;
+        ("SVG "): SVGTable table;
+        ("vhea"): VheaTable table;
+        ("vmtx"): VmtxTable table;
         (_): u8 data[td.length];
     }
     $ = defStart + sizeof(TableDirectory);
@@ -708,3 +1055,4 @@ struct TTF {
 };
 
 TTF ttf @ 0x0;
+
