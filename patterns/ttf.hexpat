@@ -442,6 +442,18 @@ struct DSIGTable {
 
 // end DSIG
 
+// begin FFTM
+
+// custom table defined by FontForge for timestamp metadata
+// defined at https://fontforge.org/docs/techref/non-standard.html
+
+struct FFTMTable {
+    u32 version;
+    LongDatetime FontForgeTimeStamp, fontCreated, fontLastModified;
+};
+
+// end FFTM
+
 // begin gasp
 
 bitfield RangeGaspBehavior {
@@ -977,18 +989,76 @@ bitfield TypeFamily {
     familyNumber : 12;
 };
 
+enum StrokeWeight : s8 {
+    UltraThin = -7,
+    ExtraThin,
+    Thin,
+    ExtraLight,
+    Light,
+    Demilight,
+    Semilight,
+    Book,
+    Semibold,
+    Demibold,
+    Bold,
+    ExtraBold,
+    Black,
+    ExtraBlack,
+    UltraBlack
+};
+
+enum WidthType : s8 {
+    UltraCompressed = -5,
+    ExtraCompressed,
+    Compressed,
+    Condensed,
+    Normal = 0,
+    Expanded = 2,
+    ExtraExpanded
+};
+
+enum SerifStyleLower : u8 {
+    SansSerifSquare,
+    SansSerifRound,
+    SerifLine,
+    SerifTriangle,
+    SerifSwath,
+    SerifBlock,
+    SerifBracket,
+    RoundedBracket,
+    FlairSerif,
+    ScriptNonconnecting,
+    ScriptJoining,
+    ScriptCalligraphic,
+    ScriptBrokenLetter,
+    Reserved = 13 ... 63
+};
+
+enum SerifStyleUpper : u8 {
+    Reserved,
+    SansSerif,
+    Serif,
+    Reserved
+};
+
+bitfield SerifStyle {
+    SerifStyleUpper ssUpper : 2;
+    SerifStyleLower ssLower : 6;
+};
+
 struct PCLTTable {
     u16 majorVersion, minorVersion;
     FontNumber fontNumber;
-    u16 pitch, xHeight;//, style, typeFamily, capHeight, symbolSet;
+    u16 pitch, xHeight;
     Style style;
-    TypeFamily typeFamily;//, capHeight, symbolSet;
+    TypeFamily typeFamily;
     u16 capHeight, symbolSet;
     char typeface[16];
     s8 characterComplement[8];
-    s8 fileName[6];
-    s8 strokeWeight, widthType;
-    u8 serifStyle;
+    char fileName[6];
+    StrokeWeight strokeWeight;
+    WidthType widthType;
+    SerifStyle serifStyle;
     padding[1];
 };
 
@@ -1166,6 +1236,7 @@ struct Table {
         ("CPAL"): CpalTable table;
         ("cvt "): CvtTable table;
         ("DSIG"): DSIGTable table;
+        ("FFTM"): FFTMTable table;
         ("gasp"): GaspTable table;
         ("GDEF"): GDEFTable table;
         // ("glyf"): GlyfTable table;
