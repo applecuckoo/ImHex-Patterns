@@ -289,48 +289,32 @@ enum Extend : u8 {
     EXTEND_REFLECT
 };
 
-struct ColorLine {
+struct ColorLine<auto var> {
     Extend extend;
     u16 numStops;
-    ColorStop colorStops[numStops];
+    if (var == true)
+        VarColorStop colorStops[numStops];
+    else
+        ColorStop colorStops[numStops];
 };
 
-struct VarColorLine {
-    Extend extend;
-    u16 numStops;
-    VarColorStop colorStops[numStops];
-};
-
-struct PaintLinearGradient {
+struct PaintLinearGradient<auto var> {
     u24 colorLineOffset;
-    ColorLine colorLine @ parent.startOfPaint + colorLineOffset;
+    ColorLine<var> colorLine @ parent.startOfPaint + colorLineOffset;
     FWord x0, y0, x1, y1, x2, y2;
+    if (var == true)
+        u32 varIndexBase;
 };
 
-struct PaintVarLinearGradient {
+struct PaintRadialGradient<auto var> {
     u24 colorLineOffset;
-    VarColorLine varColorLine @ parent.startOfPaint + colorLineOffset;
-    FWord x0, y0, x1, y1, x2, y2;
-    u32 varIndexBase;
-};
-
-struct PaintRadialGradient {
-    u24 colorLineOffset;
-    ColorLine colorLine @ parent.startOfPaint + colorLineOffset;
+    ColorLine<var> colorLine @ parent.startOfPaint + colorLineOffset;
     FWord x0, y0;
     UFWord radius0;
     FWord x1, y1;
     UFWord radius1;
-};
-
-struct PaintVarRadialGradient {
-    u24 colorLineOffset;
-    VarColorLine colorLine @ parent.startOfPaint + colorLineOffset;
-    FWord x0, y0;
-    UFWord radius0;
-    FWord x1, y1;
-    UFWord radius1;
-    u32 varIndexBase;
+    if (var == true)
+        u32 varIndexBase;
 };
 
 struct PaintSweepGradient {
@@ -387,8 +371,8 @@ struct Paint {
         (PaintFormat::PaintColrLayers): PaintColrLayer paint;
         (PaintFormat::PaintSolid): PaintSolid paint;
         (PaintFormat::PaintVarSolid): PaintVarSolid paint;
-        (PaintFormat::PaintLinearGradient): PaintLinearGradient paint;
-        (PaintFormat::PaintVarLinearGradient): PaintVarLinearGradient paint;
+        (PaintFormat::PaintLinearGradient): PaintLinearGradient<false> paint;
+        (PaintFormat::PaintVarLinearGradient): PaintLinearGradient<true> paint;
         (PaintFormat::PaintRadialGradient): PaintRadialGradient paint;
         (PaintFormat::PaintVarRadialGradient): PaintVarRadialGradient paint;
         (PaintFormat::PaintSweepGradient): PaintSweepGradient paint;
