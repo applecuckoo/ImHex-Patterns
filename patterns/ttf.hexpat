@@ -317,19 +317,13 @@ struct PaintRadialGradient<auto var> {
         u32 varIndexBase;
 };
 
-struct PaintSweepGradient {
+struct PaintSweepGradient<auto var> {
     u24 colorLineOffset;
-    ColorLine colorLine @ parent.startOfPaint + colorLineOffset;
+    ColorLine<var> colorLine @ parent.startOfPaint + colorLineOffset;
     FWord centerX, centerY;
     F2Dot14 startAngle, endAngle;
-};
-
-struct PaintVarSweepGradient {
-    u24 colorLineOffset;
-    VarColorLine colorLine @ parent.startOfPaint + colorLineOffset;
-    FWord centerX, centerY;
-    F2Dot14 startAngle, endAngle;
-    u32 varIndexBase;
+    if (var == true)
+        u32 varIndexBase;
 };
 
 using Paint;
@@ -344,24 +338,24 @@ struct PaintColrGlyph {
     u16 glyphID;
 };
 
-struct Affine2x3 {
+struct Affine2x3<auto var> {
     FixedPoint32 xx, yx, xy, yy, dx, dy;
+    if (var == true)
+        u32 varIndexBase;
 };
 
-struct VarAffine2x3 : Affine2x3 {
-    u32 varIndexBase;
-};
-
-struct PaintTransform {
+struct PaintTransform<auto var> {
     u24 paintOffset, transformOffset;
     Paint paint @ parent.startOfPaint + paintOffset;
-    Affine2x3 transform @ parent.startOfPaint + transformOffset;
+    Affine2x3<var> transform @ parent.startOfPaint + transformOffset;
 };
 
-struct PaintVarTransform {
-    u24 paintOffset, transformOffset;
+struct PaintTranslate<auto var> {
+    u24 paintOffset;
+    FWord dx, dy;
+    if (var == true)
+        u32 varIndexBase;
     Paint paint @ parent.startOfPaint + paintOffset;
-    VarAffine2x3 transform @ parent.startOfPaint + transformOffset;
 };
 
 struct Paint {
@@ -373,14 +367,16 @@ struct Paint {
         (PaintFormat::PaintVarSolid): PaintVarSolid paint;
         (PaintFormat::PaintLinearGradient): PaintLinearGradient<false> paint;
         (PaintFormat::PaintVarLinearGradient): PaintLinearGradient<true> paint;
-        (PaintFormat::PaintRadialGradient): PaintRadialGradient paint;
-        (PaintFormat::PaintVarRadialGradient): PaintVarRadialGradient paint;
-        (PaintFormat::PaintSweepGradient): PaintSweepGradient paint;
-        (PaintFormat::PaintVarSweepGradient): PaintVarSweepGradient paint;
+        (PaintFormat::PaintRadialGradient): PaintRadialGradient<false> paint;
+        (PaintFormat::PaintVarRadialGradient): PaintRadialGradient<true> paint;
+        (PaintFormat::PaintSweepGradient): PaintSweepGradient<false> paint;
+        (PaintFormat::PaintVarSweepGradient): PaintSweepGradient<true> paint;
         (PaintFormat::PaintGlyph): PaintGlyph paint;
         (PaintFormat::PaintColrGlyph): PaintColrGlyph paint;
-        (PaintFormat::PaintTransform): PaintTransform paint;
-        (PaintFormat::PaintVarTransform): PaintVarTransform paint;
+        (PaintFormat::PaintTransform): PaintTransform<false> paint;
+        (PaintFormat::PaintVarTransform): PaintTransform<true> paint;
+        (PaintFormat::PaintTranslate): PaintTranslate<false> paint;
+        (PaintFormat::PaintVarTranslate): PaintTranslate<true> paint;
     }
 };
 
