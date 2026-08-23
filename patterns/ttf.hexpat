@@ -269,18 +269,18 @@ struct PaintSolid {
     F2Dot14 alpha;
 };
 
-using Paint;
-
-struct PaintGlyph {
-    u24 paintOffset;
-    Paint paint @ parent.beginningOfPaint + paintOffset;
-    u16 glyphID;
+struct PaintVarSolid : PaintSolid {
+    u32 varIndexBase;
 };
 
 struct ColorStop {
     F2Dot14 stopOffset;
     u16 paletteIndex;
     F2Dot14 alpha;
+};
+
+struct VarColorStop : ColorStop {
+    u32 varIndexBase;
 };
 
 enum Extend : u8 {
@@ -295,20 +295,108 @@ struct ColorLine {
     ColorStop colorStops[numStops];
 };
 
+struct VarColorLine {
+    Extend extend;
+    u16 numStops;
+    VarColorStop colorStops[numStops];
+};
+
 struct PaintLinearGradient {
     u24 colorLineOffset;
-    ColorLine colorLine @ parent.beginningOfPaint + colorLineOffset;
+    ColorLine colorLine @ parent.startOfPaint + colorLineOffset;
     FWord x0, y0, x1, y1, x2, y2;
 };
 
+struct PaintVarLinearGradient {
+    u24 colorLineOffset;
+    VarColorLine varColorLine @ parent.startOfPaint + colorLineOffset;
+    FWord x0, y0, x1, y1, x2, y2;
+    u32 varIndexBase;
+};
+
+struct PaintRadialGradient {
+    u24 colorLineOffset;
+    ColorLine colorLine @ parent.startOfPaint + colorLineOffset;
+    FWord x0, y0;
+    UFWord radius0;
+    FWord x1, y1;
+    UFWord radius1;
+};
+
+struct PaintVarRadialGradient {
+    u24 colorLineOffset;
+    VarColorLine colorLine @ parent.startOfPaint + colorLineOffset;
+    FWord x0, y0;
+    UFWord radius0;
+    FWord x1, y1;
+    UFWord radius1;
+    u32 varIndexBase;
+};
+
+struct PaintSweepGradient {
+    u24 colorLineOffset;
+    ColorLine colorLine @ parent.startOfPaint + colorLineOffset;
+    FWord centerX, centerY;
+    F2Dot14 startAngle, endAngle;
+};
+
+struct PaintVarSweepGradient {
+    u24 colorLineOffset;
+    VarColorLine colorLine @ parent.startOfPaint + colorLineOffset;
+    FWord centerX, centerY;
+    F2Dot14 startAngle, endAngle;
+    u32 varIndexBase;
+};
+
+using Paint;
+
+struct PaintGlyph {
+    u24 paintOffset;
+    u16 glyphID;
+    Paint paint @ parent.startOfPaint + paintOffset;
+};
+
+struct PaintColrGlyph {
+    u16 glyphID;
+};
+
+struct Affine2x3 {
+    FixedPoint32 xx, yx, xy, yy, dx, dy;
+};
+
+struct VarAffine2x3 : Affine2x3 {
+    u32 varIndexBase;
+};
+
+struct PaintTransform {
+    u24 paintOffset, transformOffset;
+    Paint paint @ parent.startOfPaint + paintOffset;
+    Affine2x3 transform @ parent.startOfPaint + transformOffset;
+};
+
+struct PaintVarTransform {
+    u24 paintOffset, transformOffset;
+    Paint paint @ parent.startOfPaint + paintOffset;
+    VarAffine2x3 transform @ parent.startOfPaint + transformOffset;
+};
+
 struct Paint {
-    u32 beginningOfPaint = $;
+    u64 startOfPaint = $;
     PaintFormat paintFormat;
     match (paintFormat) {
-        (PaintFormat::PaintColrLayers): PaintColrLayer paintColrLayer;
-        (PaintFormat::PaintGlyph): PaintGlyph paintGlyph;
-        (PaintFormat::PaintSolid): PaintSolid paintSolid;
-        (PaintFormat::PaintLinearGradient): PaintLinearGradient paintLinearGradient;
+        (PaintFormat::PaintColrLayers): PaintColrLayer paint;
+        (PaintFormat::PaintSolid): PaintSolid paint;
+        (PaintFormat::PaintVarSolid): PaintVarSolid paint;
+        (PaintFormat::PaintLinearGradient): PaintLinearGradient paint;
+        (PaintFormat::PaintVarLinearGradient): PaintVarLinearGradient paint;
+        (PaintFormat::PaintRadialGradient): PaintRadialGradient paint;
+        (PaintFormat::PaintVarRadialGradient): PaintVarRadialGradient paint;
+        (PaintFormat::PaintSweepGradient): PaintSweepGradient paint;
+        (PaintFormat::PaintVarSweepGradient): PaintVarSweepGradient paint;
+        (PaintFormat::PaintGlyph): PaintGlyph paint;
+        (PaintFormat::PaintColrGlyph): PaintColrGlyph paint;
+        (PaintFormat::PaintTransform): PaintTransform paint;
+        (PaintFormat::PaintVarTransform): PaintVarTransform paint;
     }
 };
 
@@ -327,11 +415,11 @@ struct BaseGlyphPaintRecord {
     // in most cases a paint table will be used more than once,
     // so the pattern will redundantly re-decode the paint table.
     // feel free to contribute better solutions if you'd like!
-    Paint paintRecord @ parent.beginningOfBaseGlyphList + paintOffset;
+    Paint paintRecord @ parent.startOfBaseGlyphList + paintOffset;
 };
 
 struct BaseGlyphList {
-    u32 beginningOfBaseGlyphList = $;
+    u64 startOfBaseGlyphList = $;
     u32 numBaseGlyphPaintRecords;
     BaseGlyphPaintRecord baseGlyphPaintRecords[numBaseGlyphPaintRecords];
 };
@@ -339,21 +427,31 @@ struct BaseGlyphList {
 struct Layer {
     u32 paintOffset;
     // see above note regarding reading paint tables redundantly
-    Paint paint @ parent.beginningOfLayerList + paintOffset;
+    Paint paint @ parent.startOfLayerList + paintOffset;
 };
 
 struct LayerList {
-    u32 beginningOfLayerList = $;
+    u64 startOfLayerList = $;
     u32 numLayers;
     Layer layers[numLayers];
 };
 
+struct ClipBox {
+    u8 format;
+    // both format 1 and format 2 contain these values
+    // format 2 is for variable fonts, hence the extra index
+    FWord xMin, yMin, xMax, yMax;
+    if (format == 2)
+        u32 varIndexBase;
+};
+
 struct Clip {
     u16 startGlyphID, endGlyphID;
-    
+    u24 clipBoxOffset;
 };
 
 struct ClipList {
+
     u8 format;
     u32 numClips;
     Clip clips[numClips];
@@ -365,16 +463,16 @@ struct ColrTable {
     u32 baseGlyphRecordsOffset, layerRecordsOffset;
     u16 numLayerRecords;
     if (baseGlyphRecordsOffset != 0)
-    BaseGlyph baseGlyphs[numBaseGlyphRecords];
+        BaseGlyph baseGlyphs[numBaseGlyphRecords];
     if (layerRecordsOffset != 0)
-    LayerRecord layerRecords[numBaseGlyphRecords];
+        LayerRecord layerRecords[numBaseGlyphRecords];
     if (version == 1) {
         u32 baseGlyphListOffset, layerListOffset, clipListOffset, varIndexMapOffset, itemVariationStoreOffset;
         BaseGlyphList baseGlyphList @ startOfColrTable + baseGlyphListOffset;
         if (layerListOffset != 0)
-        LayerList layerList @ startOfColrTable + layerListOffset;
+            LayerList layerList @ startOfColrTable + layerListOffset;
         if (clipListOffset != 0)
-        ClipList clipList @ startOfColrTable + clipListOffset;
+            ClipList clipList @ startOfColrTable + clipListOffset;
     }
     
 };
@@ -429,11 +527,11 @@ struct SignatureBlock1 {
 
 struct SignatureRecord {
     u32 format, length, signatureBlockOffset;
-    SignatureBlock1 signatureBlock @ parent.beginningOfDSIGTable + signatureBlockOffset;
+    SignatureBlock1 signatureBlock @ parent.startOfDSIGTable + signatureBlockOffset;
 };
 
 struct DSIGTable {
-    u32 beginningOfDSIGTable  = $;
+    u64 startOfDSIGTable  = $;
     u32 version;
     u16 numSignatures;
     DSIGFlags flags;
@@ -494,19 +592,19 @@ struct AttachPoint {
 //struct AttachPoint
 
 struct AttachList {
-    u32 beginningOfAttachList = $;
+    u64 startOfAttachList = $;
     u16 coverageOffset, glyphCount;
     
 };
 
 struct GDEFTable {
-    u32 beginningOfGDEFTable = $;
+    u64 startOfGDEFTable = $;
     u16 majorVersion, minorVersion, glyphClassDefOffset, attachListOffset, ligCaretListOffset, markAttachClassDefOffset;
     
     if (glyphClassDefOffset != 0)
-        ClassDefFormat<"GDEF"> glyphClassDef @ beginningOfGDEFTable + glyphClassDefOffset;
+        ClassDefFormat<"GDEF"> glyphClassDef @ startOfGDEFTable + glyphClassDefOffset;
     if (attachListOffset != 0)
-        AttachList attachList @ beginningOfGDEFTable + attachListOffset;
+        AttachList attachList @ startOfGDEFTable + attachListOffset;
     // this is a cheeky version check, it doesn't account for any major version increases
     if (minorVersion >= 2)
         u16 markGlyphSetsDefOffset;
@@ -1159,7 +1257,7 @@ struct VDMXGroupOffset {
 };
 
 struct VDMXTable {
-    u32 startOfVDMX = $;
+    u64 startOfVDMX = $;
     u16 version, numRecs, numRatios;
     RatioRange ratRange[numRatios];
     VDMXGroupOffset vdmxGroupOffsets[numRatios];
