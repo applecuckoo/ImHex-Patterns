@@ -82,6 +82,28 @@ struct ClassDefFormat<auto tableString> {
 
 // end layout common table formats
 
+// begin variable common table formats
+
+bitfield EntryFormat {
+    innerIndexBitCount : 4;
+    mapEntrySize : 2;
+    padding : 2;
+};
+
+struct DeltaSetIndexMap {
+    u8 format;
+    EntryFormat entryFormat;
+    u8 entrySize = entryFormat.mapEntrySize + 1;
+    if (format == 0)
+        u16 mapCount;
+    if (format == 1)
+        u32 mapCount;
+    u32 mapDataTotal = mapCount * entrySize;
+    u8 mapData[mapDataTotal];
+};
+
+// end variable common table formats
+
 // begin avar
 
 struct AxisValueMap {
@@ -543,6 +565,8 @@ struct ColrTable {
             LayerList layerList @ startOfColrTable + layerListOffset;
         if (clipListOffset != 0)
             ClipList clipList @ startOfColrTable + clipListOffset;
+        if (varIndexMapOffset != 0)
+            DeltaSetIndexMap varIndexMap @ startOfColrTable + varIndexMapOffset;
     }
     
 };
