@@ -997,6 +997,36 @@ struct MaxpTable {
 
 // end maxp
 
+// start morx
+
+// this is my best attempt, for some reason Apple's documentation is way more confusing
+
+struct MetamorphosisSubtable {
+    u32 length;
+    u32 coverage;
+    u32 subFeatureFlags;
+};
+
+struct FeatureTable {
+    u16 featureType, featureSetting;
+    u32 enableFlags, disableFlags;
+};
+
+struct Chain {
+    u32 defaultFlags, chainLength, nFeatureEntries, nSubtables;
+    FeatureTable featureTables[nFeatureEntries];
+    MetamorphosisSubtable metamorphosisSubtable;
+};
+
+struct MorxTable {
+    u16 version;
+    padding[2];
+    u32 nChains;
+    Chain chains[nChains];
+};
+
+// end morx
+
 // begin name
 
 u64 curStorageOffset;
@@ -1441,6 +1471,7 @@ struct Table {
         ("loca"): LocaTable table;
         ("LTSH"): LTSHTable table;
         ("maxp"): MaxpTable table;
+        ("morx"): MorxTable table;
         ("name"): NameTable table;
         ("OS/2"): OS2Table table;
         ("PCLT"): PCLTTable table;
