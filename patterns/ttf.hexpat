@@ -358,6 +358,80 @@ struct PaintTranslate<auto var> {
     Paint paint @ parent.startOfPaint + paintOffset;
 };
 
+struct PaintScale<auto var, auto aroundCenter, auto uniform> {
+    // combined format to cover formats 16-23
+    u24 paintOffset;
+    if (uniform == true)
+        F2Dot14 scale;
+    else
+        F2Dot14 scaleX, scaleY;
+    if (aroundCenter == true)
+        FWord centerX, centerY;
+    if (var == true)
+        u32 varIndexBase;
+    Paint paint @ parent.startOfPaint + paintOffset;
+};
+
+struct PaintRotate<auto var, auto aroundCenter> {
+    u24 paintOffset;
+    F2Dot14 angle;
+    if (aroundCenter == true)
+        FWord centerX, centerY;
+    if (var == true)
+        u32 varIndexBase;
+    Paint paint @ parent.startOfPaint + paintOffset;
+};
+
+struct PaintSkew<auto var, auto aroundCenter> {
+    u24 paintOffset;
+    F2Dot14 xSkewAngle, ySkewAngle;
+    if (aroundCenter == true)
+        FWord centerX, centerY;
+    if (var == true)
+        u32 varIndexBase;
+    Paint paint @ parent.startOfPaint + paintOffset;
+};
+
+enum CompositeMode : u8 {
+    COMPOSITE_CLEAR,
+    COMPOSITE_SRC,
+    COMPOSITE_DEST,
+    COMPOSITE_SRC_OVER,
+    COMPOSITE_DEST_OVER,
+    COMPOSITE_SRC_IN,
+    COMPOSITE_DEST_IN,
+    COMPOSITE_SRC_OUT,
+    COMPOSITE_DEST_OUT,
+    COMPOSITE_SRC_ATOP,
+    COMPOSITE_DEST_ATOP,
+    COMPOSITE_XOR,
+    COMPOSITE_PLUS,
+    COMPOSITE_SCREEN,
+    COMPOSITE_OVERLAY,
+    COMPOSITE_DARKEN,
+    COMPOSITE_LIGHTEN,
+    COMPOSITE_COLOR_DODGE,
+    COMPOSITE_COLOR_BURN,
+    COMPOSITE_HARD_LIGHT,
+    COMPOSITE_SOFT_LIGHT,
+    COMPOSITE_DIFFERENCE,
+    COMPOSITE_EXCLUSION,
+    COMPOSITE_MULTIPLY,
+    COMPOSITE_HSL_HUE,
+    COMPOSITE_HSL_SATURATION,
+    COMPOSITE_HSL_COLOR,
+    COMPOSITE_HSL_LUMINOSITY
+};
+
+struct PaintComposite {
+    u24 sourcePaintOffset;
+    CompositeMode compositeMode;
+    u24 backdropPaintOffset;
+    Paint sourcePaint @ parent.startOfPaint + sourcePaintOffset;
+    Paint backdropPaint @ parent.startOfPaint + backdropPaintOffset;
+    
+};
+
 struct Paint {
     u64 startOfPaint = $;
     PaintFormat paintFormat;
@@ -377,6 +451,23 @@ struct Paint {
         (PaintFormat::PaintVarTransform): PaintTransform<true> paint;
         (PaintFormat::PaintTranslate): PaintTranslate<false> paint;
         (PaintFormat::PaintVarTranslate): PaintTranslate<true> paint;
+        (PaintFormat::PaintScale): PaintScale<false, false, false> paint;
+        (PaintFormat::PaintVarScale): PaintScale<true, false, false> paint;
+        (PaintFormat::PaintScaleAroundCenter): PaintScale<false, true, false> paint;
+        (PaintFormat::PaintVarScaleAroundCenter): PaintScale<true, true, false> paint;
+        (PaintFormat::PaintScaleUniform): PaintScale<false, false, true> paint;
+        (PaintFormat::PaintVarScaleUniform): PaintScale<true, false, true> paint;
+        (PaintFormat::PaintScaleUniformAroundCenter): PaintScale<false, true, true> paint;
+        (PaintFormat::PaintVarScaleUniformAroundCenter): PaintScale<true, true, true> paint;
+        (PaintFormat::PaintRotate): PaintRotate<false, false> paint;
+        (PaintFormat::PaintVarRotate): PaintRotate<true, false> paint;
+        (PaintFormat::PaintRotateAroundCenter): PaintRotate<false, true> paint;
+        (PaintFormat::PaintVarRotateAroundCenter): PaintRotate<true, true> paint;
+        (PaintFormat::PaintSkew): PaintSkew<false, false> paint;
+        (PaintFormat::PaintVarSkew): PaintSkew<true, false> paint;
+        (PaintFormat::PaintSkewAroundCenter): PaintSkew<false, true> paint;
+        (PaintFormat::PaintVarSkewAroundCenter): PaintSkew<true, true> paint;
+        (PaintFormat::PaintComposite): PaintComposite paint;
     }
 };
 
@@ -431,7 +522,6 @@ struct Clip {
 };
 
 struct ClipList {
-
     u8 format;
     u32 numClips;
     Clip clips[numClips];
