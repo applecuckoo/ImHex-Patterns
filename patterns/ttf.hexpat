@@ -102,6 +102,57 @@ struct DeltaSetIndexMap {
     u8 mapData[mapDataTotal];
 };
 
+struct RegionAxisCoordinates {
+    F2Dot14 startCoord, peakCoord, endCoord;
+};
+
+struct VariationRegion {
+    RegionAxisCoordinates regionAxes[parent.axisCount];
+};
+
+struct VariationRegionList {
+    u16 axisCount, regionCount;
+    VariationRegion variationRegions[regionCount];
+};
+
+bitfield WordDeltaCount {
+    wordDeltaCount : 15;
+    longWords : 1;
+};
+
+struct DeltaSet {
+    if (parent.wordDeltaCount.longWords == 1) {
+        s32 deltaDataLong[parent.wordDeltaCount.wordDeltaCount];
+        s16 deltaDataShort[parent.regionIndexCount - parent.wordDeltaCount.wordDeltaCount];
+    } else {
+        s16 deltaDataLong[parent.wordDeltaCount.wordDeltaCount];
+        s8 deltaDataShort[parent.regionIndexCount - parent.wordDeltaCount.wordDeltaCount];
+    }
+};
+
+struct ItemVariationData {
+    u16 itemCount;
+    WordDeltaCount wordDeltaCount;
+    u16 regionIndexCount;
+    u16 regionIndexes[regionIndexCount];
+    DeltaSet deltaSets[itemCount];
+    
+};
+
+struct ItemVariationDataOffset {
+    u32 itemVariationDataOffset;
+    ItemVariationData itemVariationData @ parent.startOfItemVariationStore + itemVariationDataOffset;
+};
+
+struct ItemVariationStore {
+    u32 startOfItemVariationStore = $;
+    u16 format;
+    u32 variationRegionListOffset;
+    u16 itemVariationDataCount;
+    ItemVariationDataOffset itemVariationDataOffsets[itemVariationDataCount];
+    VariationRegionList variationRegionList @ startOfItemVariationStore + variationRegionListOffset;
+};
+
 // end variable common table formats
 
 // begin avar
@@ -567,6 +618,8 @@ struct ColrTable {
             ClipList clipList @ startOfColrTable + clipListOffset;
         if (varIndexMapOffset != 0)
             DeltaSetIndexMap varIndexMap @ startOfColrTable + varIndexMapOffset;
+        if (itemVariationStoreOffset != 0)
+            ItemVariationStore itemVariationStore @ startOfColrTable + itemVariationStoreOffset;
     }
     
 };
@@ -578,6 +631,12 @@ struct ColrTable {
 struct ColorRecord {
     u8 blue, green, red, alpha;
 }[[hex::inline_visualize("color", red, green, blue, alpha)]];
+
+bitfield PaletteTypes {
+    usableWithLightBackground : 1;
+    usableWithDarkBackground: 1;
+    padding : 30;
+};
 
 struct CpalTable {
     u64 startOfCpalTable = $;
@@ -591,6 +650,12 @@ struct CpalTable {
         u32 paletteTypesArrayOffset;
         u32 paletteLabelsArrayOffset;
         u32 paletteEntryLabelsArrayOffset;
+        if (paletteTypesArrayOffset != 0)
+            PaletteTypes paletteTypes[numPalettes] @ startOfCpalTable + paletteTypesArrayOffset;
+        if (paletteLabelsArrayOffset != 0)
+            u16 paletteLabels[numPalettes] @ startOfCpalTable + paletteLabelsArrayOffset;
+        if (paletteEntryLabelsArrayOffset != 0)
+            u16 paletteEntryLabels[numPaletteEntries] @ startOfCpalTable + paletteEntryLabelsArrayOffset;
     }
     ColorRecord colorRecords[numColorRecords] @ startOfCpalTable + colorRecordsArrayOffset;
 };
@@ -688,6 +753,36 @@ struct AttachPoint {
 struct AttachList {
     u64 startOfAttachList = $;
     u16 coverageOffset, glyphCount;
+    
+};
+
+struct CaretValue {
+    u16 format;
+    if (format == 1)
+        s16 coordinate;
+    if (format == 2)
+        u16 caretValuePointIndex;
+};
+
+struct CaretValueOffset {
+    u16 caretValueOffset;
+    CaretValue caretValue @ parent.beginningOfCaretValue + caretValueOffset;
+};
+
+struct LigGlyph {
+    u64 beginningOfCaretValue = $;
+    u16 caretCount;
+    CaretValueOffset caretValueOffsets[caretCount];
+};
+
+struct LigGlyphOffset {
+    u16 ligGlyphOffset;
+    
+};
+
+struct LigCaretList {
+    u64 beginningOfLigCaretList = $;
+    u16 coverageOffset, ligGlyphCount;
     
 };
 
@@ -925,6 +1020,44 @@ struct HmtxTable {
 
 // end hmtx
 
+// begin kern
+
+bitfield KernCoverage {
+    format: 8;
+    padding : 4;
+    override : 1;
+    crossStream : 1;
+    minimum : 1;
+    horizontal : 1;
+};
+
+struct KernPair {
+    u16 left, right;
+    FWord value;
+};
+
+struct KernSubtableFormat0 {
+    u16 nPairs, searchRange, entrySelector, rangeShift;
+    KernPair kernPairs[nPairs];
+};
+
+// TODO: implement KernSubtableFormat2
+
+struct KerningSubtable {
+    u16 version, length;
+    KernCoverage coverage;
+    if (coverage.format == 0) {
+        KernSubtableFormat0 kernInnerSubtable;
+    }
+};
+
+struct KernTable {
+    u16 version, nTables;
+    KerningSubtable kerningSubtables[nTables];
+};
+
+// end kern
+
 // begin loca
 
 // loca contains offsets for glyf tables, so
@@ -996,36 +1129,6 @@ struct MaxpTable {
 };
 
 // end maxp
-
-// start morx
-
-// this is my best attempt, for some reason Apple's documentation is way more confusing
-
-struct MetamorphosisSubtable {
-    u32 length;
-    u32 coverage;
-    u32 subFeatureFlags;
-};
-
-struct FeatureTable {
-    u16 featureType, featureSetting;
-    u32 enableFlags, disableFlags;
-};
-
-struct Chain {
-    u32 defaultFlags, chainLength, nFeatureEntries, nSubtables;
-    FeatureTable featureTables[nFeatureEntries];
-    MetamorphosisSubtable metamorphosisSubtable;
-};
-
-struct MorxTable {
-    u16 version;
-    padding[2];
-    u32 nChains;
-    Chain chains[nChains];
-};
-
-// end morx
 
 // begin name
 
@@ -1138,6 +1241,7 @@ struct OS2Table {
 
 bitfield FontNumberFlag {
     converted : 1;
+    cvendor : 7;
 };
 
 // yes this is set up as a janky union
@@ -1468,10 +1572,10 @@ struct Table {
         ("head"): HeadTable table;
         ("hhea"): HheaTable table;
         ("hmtx"): HmtxTable table;
+        ("kern"): KernTable table;
         ("loca"): LocaTable table;
         ("LTSH"): LTSHTable table;
         ("maxp"): MaxpTable table;
-        ("morx"): MorxTable table;
         ("name"): NameTable table;
         ("OS/2"): OS2Table table;
         ("PCLT"): PCLTTable table;
