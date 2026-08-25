@@ -52,6 +52,7 @@ u64 currentOffset;
 u64 currentLength;
 u64 glyfStart;
 bool hasPostScriptOutlines = false;
+bool isVariableFont = false;
 u16 numHMetrics;
 u16 gNumGlyphs;
 u16 numOfLongVerMetrics;
