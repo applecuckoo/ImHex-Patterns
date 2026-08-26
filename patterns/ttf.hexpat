@@ -914,6 +914,16 @@ struct GlyfTable {
 
 // end glyf
 
+// start GSUB
+
+struct GSUBTable {
+    u64 startOfGSUBTable = $;
+    u16 majorVersion, minorVersion, scriptListOffset, featureListOffset, lookupListOffset;
+    
+};
+
+// end GSUB
+
 // begin hdmx
 
 struct DeviceRecord {
@@ -1569,6 +1579,7 @@ struct Table {
         // ("glyf"): GlyfTable table;
         // glyf will be contained in loca.
         ("glyf"): {}
+        ("GSUB"): GSUBTable table;
         ("hdmx"): HdmxTable table;
         ("head"): HeadTable table;
         ("hhea"): HheaTable table;
