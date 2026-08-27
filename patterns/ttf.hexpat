@@ -176,6 +176,46 @@ struct AvarTable {
 
 // end avar
 
+// begin BASE
+
+struct Tag {
+    char value[4];
+};
+
+struct BaseTagList {
+    u16 baseTagCount;
+    Tag baselineTags[baseTagCount];
+};
+
+struct BaseScriptRecord {
+    Tag baseScriptTag;
+    u16 baseScriptOffset;
+};
+
+struct BaseScriptList {
+    u16 baseScriptCount;
+    BaseScriptRecord baseScriptRecords[baseScriptCount];
+};
+
+struct Axis {
+    u64 startOfAxis = $;
+    u16 baseTagListOffset, baseScriptListOffset;
+    if (baseTagListOffset != 0)
+        BaseTagList baseTagList @ startOfAxis + baseTagListOffset;
+    BaseScriptList baseScriptList @ startOfAxis + baseScriptListOffset;
+};
+
+struct BASETable {
+    u64 startOfBASETable = $;
+    u16 majorVersion, minorVersion, horizAxisOffset, vertAxisOffset;
+    if (horizAxisOffset != 0)
+        Axis horizAxis @ startOfBASETable + horizAxisOffset;
+    if (vertAxisOffset != 0)
+        Axis vertAxis @ startOfBASETable + vertAxisOffset;
+};
+
+// end BASE
+
 // begin cmap
 
 u64 startOfCmapTable = 0;
@@ -1567,6 +1607,7 @@ struct Table {
     currentLength = td.length;
     match (td.tag) {
         ("avar"): AvarTable table;
+        ("BASE"): BASETable table;
         ("bhed"): HeadTable table;
         ("cmap"): CmapTable table;
         ("COLR"): ColrTable table;
