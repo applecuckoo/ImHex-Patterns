@@ -81,6 +81,21 @@ struct ClassDefFormat<auto tableString> {
     }
 };
 
+struct RangeRecord {
+    u16 startGlyphID, endGlyphID, startCoverageIndex;
+};
+
+struct Coverage {
+    u16 format;
+    if (format == 1) {
+        u16 glyphCount;
+        u16 glyphArray[glyphCount];
+    } if (format == 2) {
+        u16 rangeCount;
+        RangeRecord rangeRecords[rangeCount];
+    }
+};
+
 // end layout common table formats
 
 // begin variable common table formats
@@ -187,6 +202,21 @@ struct BaseTagList {
     Tag baselineTags[baseTagCount];
 };
 
+struct BaseLangSys {
+    Tag baseLangSysTag;
+    u16 minMaxOffset;
+};
+
+struct BaseValues {
+    
+};
+
+struct BaseScript {
+    u64 startOfBaseScript = $;
+    u16 baseValuesOffset, defaultMinMaxOffset, baseLangSysCount;
+    BaseLangSys baseLangSysRecords[baseLangSysCount];
+};
+
 struct BaseScriptRecord {
     Tag baseScriptTag;
     u16 baseScriptOffset;
@@ -212,6 +242,11 @@ struct BASETable {
         Axis horizAxis @ startOfBASETable + horizAxisOffset;
     if (vertAxisOffset != 0)
         Axis vertAxis @ startOfBASETable + vertAxisOffset;
+    if (minorVersion >= 1) {
+        u32 itemVarStoreOffset;
+        if (itemVarStoreOffset != 0)
+            ItemVariationStore itemVarStore @ startOfBASETable + itemVarStoreOffset;
+    }
 };
 
 // end BASE
@@ -818,12 +853,14 @@ struct LigGlyph {
 
 struct LigGlyphOffset {
     u16 ligGlyphOffset;
-    
+    LigGlyph ligGlyph @ parent.beginningOfLigCaretList + ligGlyphOffset;
 };
 
 struct LigCaretList {
     u64 beginningOfLigCaretList = $;
     u16 coverageOffset, ligGlyphCount;
+    Coverage coverage @ beginningOfLigCaretList + coverageOffset;
+    LigGlyphOffset ligGlyphOffsets[ligGlyphCount];
     
 };
 
@@ -835,6 +872,8 @@ struct GDEFTable {
         ClassDefFormat<"GDEF"> glyphClassDef @ startOfGDEFTable + glyphClassDefOffset;
     if (attachListOffset != 0)
         AttachList attachList @ startOfGDEFTable + attachListOffset;
+    if (ligCaretListOffset != 0)
+        LigCaretList ligCaretList @ startOfGDEFTable + ligCaretListOffset;
     // this is a cheeky version check, it doesn't account for any major version increases
     if (minorVersion >= 2)
         u16 markGlyphSetsDefOffset;
@@ -953,6 +992,18 @@ struct GlyfTable {
 } [[name(std::format("glyf ({})", table.numContours < 0 ? "Composite" : "Simple"))]];
 
 // end glyf
+
+// start GPOS
+
+struct GPOSTable {
+    u64 startOfGPOSTable = $;
+    u16 majorVersion, minorVersion, scriptListOffset, featureListOffset, lookupListOffset;
+    if (minorVersion >= 1)
+        u32 featureVariationsOffset;
+    
+};
+
+// end GPOS
 
 // start GSUB
 
@@ -1620,6 +1671,7 @@ struct Table {
         // ("glyf"): GlyfTable table;
         // glyf will be contained in loca.
         ("glyf"): {}
+        ("GPOS"): GPOSTable table;
         ("GSUB"): GSUBTable table;
         ("hdmx"): HdmxTable table;
         ("head"): HeadTable table;
